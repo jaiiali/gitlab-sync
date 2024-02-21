@@ -1,0 +1,24 @@
+stages:
+  - test
+  - build
+  - dockerize
+  - deploy
+
+lint:
+  stage: test
+  script:
+    - make mod
+    - make lint
+
+test:
+  stage: test
+  script:
+    - make mod
+    - make test
+  coverage: '/total:\s+\(statements\)\s+(\d+.\d+\%)/'
+
+build:
+  stage: build
+  script:
+    - make mod
+    - make build
