@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"slices"
+	"strings"
 )
 
 const (
@@ -12,6 +13,7 @@ const (
 	baseURLEnv    = "BASE_URL"
 	tokenEnv      = "TOKEN"
 	orderByEnv    = "ORDER_BY"
+	installEnv    = "INSTALL"
 	dirPermission = 0o766
 )
 
@@ -30,6 +32,7 @@ func main() {
 	baseURL := os.Getenv(baseURLEnv)
 	token := os.Getenv(tokenEnv)
 	orderBy := os.Getenv(orderByEnv)
+	install := os.Getenv(installEnv)
 
 	if basePath == "" || baseURL == "" || token == "" {
 		slog.Error("mandatory envs have no value")
@@ -40,6 +43,11 @@ func main() {
 	orderByItems := []string{"id", "name", "path", "created_at", "updated_at", "last_activity_at"}
 	if orderBy == "" || !slices.Contains(orderByItems, orderBy) {
 		orderBy = "id"
+	}
+
+	installPackage := false
+	if strings.ToLower(install) == "true" {
+		installPackage = true
 	}
 
 	projects := getProjects(baseURL, token, orderBy)
@@ -93,6 +101,19 @@ func main() {
 
 		if len(gitOut) > 0 {
 			slog.Info(string(gitOut))
+		}
+
+		// Get packages
+		if installPackage {
+			packageOut, packageErr := getPackage(projectPath)
+
+			if packageErr != nil {
+				slog.Error(packageErr.Error())
+			}
+
+			if len(packageOut) > 0 {
+				slog.Info(string(packageOut))
+			}
 		}
 	}
 }

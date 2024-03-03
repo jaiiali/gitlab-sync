@@ -11,8 +11,8 @@ func clone(url, dir string) ([]byte, error) {
 	return cmd.Output()
 }
 
-func pull(path string) ([]byte, error) {
-	err := os.Chdir(path)
+func pull(dir string) ([]byte, error) {
+	err := os.Chdir(dir)
 	if err != nil {
 		return []byte{}, err
 	}
