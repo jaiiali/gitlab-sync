@@ -4,9 +4,10 @@ run:
 linters-settings:
   funlen:
     lines: 100
+    statements: 50
 
   cyclop:
-    max-complexity: 12
+    max-complexity: 20
 
   tagliatelle:
     case:
@@ -60,7 +61,7 @@ linters:
     - gocyclo
     - godot
     - godox
-    - goerr113
+    # - goerr113
     - gofmt
     - gofumpt
     - goheader

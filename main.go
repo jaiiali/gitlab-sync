@@ -9,12 +9,13 @@ import (
 )
 
 const (
-	basePathEnv   = "BASE_PATH"
-	baseURLEnv    = "BASE_URL"
-	tokenEnv      = "TOKEN"
-	orderByEnv    = "ORDER_BY"
-	installEnv    = "INSTALL"
-	dirPermission = 0o766
+	basePathEnv    = "BASE_PATH"
+	baseURLEnv     = "BASE_URL"
+	repoURLTypeEnv = "REPO_URL_TYPE"
+	tokenEnv       = "TOKEN"
+	orderByEnv     = "ORDER_BY"
+	installEnv     = "INSTALL"
+	dirPermission  = 0o766
 )
 
 var (
@@ -30,6 +31,7 @@ func main() {
 
 	basePath := os.Getenv(basePathEnv)
 	baseURL := os.Getenv(baseURLEnv)
+	repoURLType := os.Getenv(repoURLTypeEnv)
 	token := os.Getenv(tokenEnv)
 	orderBy := os.Getenv(orderByEnv)
 	install := os.Getenv(installEnv)
@@ -38,6 +40,10 @@ func main() {
 		slog.Error("mandatory envs have no value")
 
 		return
+	}
+
+	if strings.ToLower(repoURLType) == repoURLTypeHTTP {
+		repoURLType = repoURLTypeHTTP
 	}
 
 	orderByItems := []string{"id", "name", "path", "created_at", "updated_at", "last_activity_at"}
@@ -50,10 +56,9 @@ func main() {
 		installPackage = true
 	}
 
-	projects := getProjects(baseURL, token, orderBy)
+	projects := getProjects(baseURL, repoURLType, token, orderBy)
 
 	projectsCount := len(projects)
-
 	if projectsCount == 0 {
 		slog.Info("no projects found")
 
@@ -71,6 +76,8 @@ func main() {
 	}
 
 	for i, project := range projects {
+		fmt.Println()
+
 		slog.Info("processing project",
 			"index", i,
 			"path", project.PathWithNamespace,
@@ -92,7 +99,8 @@ func main() {
 		} else {
 			slog.Info("git clone")
 
-			gitOut, gitErr = clone(project.SSHURLToRepo, projectPath)
+			repoURL := getRepoURL(repoURLType, project)
+			gitOut, gitErr = clone(repoURL, projectPath)
 		}
 
 		if gitErr != nil {

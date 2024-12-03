@@ -13,17 +13,24 @@ import (
 )
 
 const (
+	MaxErrCount        = 20
 	pageSize           = 20
 	privateTokenHeader = "PRIVATE-TOKEN"
 )
 
-func getProjects(baseURL, token, orderBy string) []Projects {
+func getProjects(baseURL, repoURLType, token, orderBy string) []Projects {
 	var (
 		pageNumber int
 		projects   []Projects
 	)
 
+	errCount := 0
+
 	for {
+		if errCount >= MaxErrCount {
+			break
+		}
+
 		pageNumber++
 		url := fmt.Sprintf("%s/api/v4/projects?order_by=%s&sort=desc&per_page=%d&page=%d",
 			baseURL,
@@ -39,6 +46,8 @@ func getProjects(baseURL, token, orderBy string) []Projects {
 				"url", url,
 			)
 
+			errCount++
+
 			continue
 		}
 
@@ -51,6 +60,8 @@ func getProjects(baseURL, token, orderBy string) []Projects {
 				"url", url,
 			)
 
+			errCount++
+
 			continue
 		}
 
@@ -58,7 +69,7 @@ func getProjects(baseURL, token, orderBy string) []Projects {
 			projects = append(projects, currentProjects...)
 
 			for _, project := range currentProjects {
-				wikiProject, wikiErr := getWikis(baseURL, token, project)
+				wikiProject, wikiErr := getWikis(baseURL, repoURLType, token, project)
 				if wikiErr != nil {
 					continue
 				}
@@ -68,14 +79,12 @@ func getProjects(baseURL, token, orderBy string) []Projects {
 		} else {
 			break
 		}
-
-		// time.Sleep(3 * time.Second)
 	}
 
 	return projects
 }
 
-func getWikis(baseURL, token string, project Projects) (Projects, error) {
+func getWikis(baseURL, repoURLType, token string, project Projects) (Projects, error) {
 	url := fmt.Sprintf("%s/api/v4/projects/%d/wikis", baseURL, project.ID)
 
 	body, err := do(url, token)
@@ -92,11 +101,13 @@ func getWikis(baseURL, token string, project Projects) (Projects, error) {
 		return Projects{}, fmt.Errorf("no found wikis")
 	}
 
+	repoURL := getRepoURL(repoURLType, project)
+
 	return Projects{
 		ID:                0,
 		Name:              project.Name + ".wiki",
 		PathWithNamespace: project.PathWithNamespace + ".wiki",
-		SSHURLToRepo:      strings.Replace(project.SSHURLToRepo, ".git", ".wiki.git", 1),
+		HTTPURLToRepo:     strings.Replace(repoURL, ".git", ".wiki.git", 1),
 	}, nil
 }
 
@@ -136,4 +147,12 @@ func do(url, token string) ([]byte, error) {
 	}
 
 	return body, nil
+}
+
+func getRepoURL(repoURLType string, project Projects) string {
+	if repoURLType == repoURLTypeHTTP {
+		return project.HTTPURLToRepo
+	}
+
+	return project.SSHURLToRepo
 }
