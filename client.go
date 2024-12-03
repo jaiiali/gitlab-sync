@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	MaxErrCount        = 20
+	maxErrCount        = 20
 	pageSize           = 20
 	privateTokenHeader = "PRIVATE-TOKEN"
 )
@@ -27,7 +27,7 @@ func getProjects(baseURL, repoURLType, token, orderBy string) []Projects {
 	errCount := 0
 
 	for {
-		if errCount >= MaxErrCount {
+		if errCount >= maxErrCount {
 			break
 		}
 
