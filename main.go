@@ -9,13 +9,14 @@ import (
 )
 
 const (
-	basePathEnv    = "BASE_PATH"
-	baseURLEnv     = "BASE_URL"
-	repoURLTypeEnv = "REPO_URL_TYPE"
-	tokenEnv       = "TOKEN"
-	orderByEnv     = "ORDER_BY"
-	installEnv     = "INSTALL"
-	dirPermission  = 0o766
+	basePathEnv                     = "BASE_PATH"
+	baseURLEnv                      = "BASE_URL"
+	repoURLTypeEnv                  = "REPO_URL_TYPE"
+	tokenEnv                        = "TOKEN"
+	orderByEnv                      = "ORDER_BY"
+	setContainerExpirationPolicyEnv = "SET_CONTAINER_EXPIRATION_POLICY"
+	installEnv                      = "INSTALL"
+	dirPermission                   = 0o766
 )
 
 var (
@@ -34,6 +35,7 @@ func main() {
 	repoURLType := os.Getenv(repoURLTypeEnv)
 	token := os.Getenv(tokenEnv)
 	orderBy := os.Getenv(orderByEnv)
+	setContainerExpirationPolicy := os.Getenv(setContainerExpirationPolicyEnv)
 	install := os.Getenv(installEnv)
 
 	if basePath == "" || baseURL == "" || token == "" {
@@ -51,12 +53,17 @@ func main() {
 		orderBy = "id"
 	}
 
+	setContainerExpirationPolicyAttr := false
+	if strings.ToLower(setContainerExpirationPolicy) == "true" {
+		setContainerExpirationPolicyAttr = true
+	}
+
 	installPackage := false
 	if strings.ToLower(install) == "true" {
 		installPackage = true
 	}
 
-	projects := getProjects(baseURL, repoURLType, token, orderBy)
+	projects := getProjects(baseURL, repoURLType, token, orderBy, setContainerExpirationPolicyAttr)
 
 	projectsCount := len(projects)
 	if projectsCount == 0 {

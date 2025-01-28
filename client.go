@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -13,12 +14,14 @@ import (
 )
 
 const (
-	maxErrCount        = 20
-	pageSize           = 20
-	privateTokenHeader = "PRIVATE-TOKEN"
+	maxErrCount           = 20
+	pageSize              = 20
+	privateTokenHeader    = "PRIVATE-TOKEN"
+	contentTypeHeader     = "Content-Type"
+	applicationJSONHeader = "application/json"
 )
 
-func getProjects(baseURL, repoURLType, token, orderBy string) []Projects {
+func getProjects(baseURL, repoURLType, token, orderBy string, setContainerExpirationPolicyAttr bool) []Projects {
 	var (
 		pageNumber int
 		projects   []Projects
@@ -39,7 +42,7 @@ func getProjects(baseURL, repoURLType, token, orderBy string) []Projects {
 			pageNumber,
 		)
 
-		body, err := do(url, token)
+		respBody, err := do(http.MethodGet, url, token, nil)
 		if err != nil {
 			slog.Error("http error",
 				"error", err.Error(),
@@ -53,7 +56,7 @@ func getProjects(baseURL, repoURLType, token, orderBy string) []Projects {
 
 		var currentProjects []Projects
 
-		err = json.Unmarshal(body, &currentProjects)
+		err = json.Unmarshal(respBody, &currentProjects)
 		if err != nil {
 			slog.Error("unmarshal error",
 				"error", err.Error(),
@@ -67,6 +70,22 @@ func getProjects(baseURL, repoURLType, token, orderBy string) []Projects {
 
 		if len(currentProjects) > 0 {
 			projects = append(projects, currentProjects...)
+
+			if setContainerExpirationPolicyAttr {
+				for _, project := range currentProjects {
+					hasReg, hasRegistryErr := hasRegistry(baseURL, token, project)
+					if hasRegistryErr != nil {
+						slog.Error(hasRegistryErr.Error())
+					}
+
+					if hasReg {
+						setCleanupErr := setCleanup(baseURL, token, project)
+						if setCleanupErr != nil {
+							slog.Error(setCleanupErr.Error())
+						}
+					}
+				}
+			}
 
 			for _, project := range currentProjects {
 				wikiProject, wikiErr := getWikis(baseURL, repoURLType, token, project)
@@ -87,7 +106,7 @@ func getProjects(baseURL, repoURLType, token, orderBy string) []Projects {
 func getWikis(baseURL, repoURLType, token string, project Projects) (Projects, error) {
 	url := fmt.Sprintf("%s/api/v4/projects/%d/wikis", baseURL, project.ID)
 
-	body, err := do(url, token)
+	respBody, err := do(http.MethodGet, url, token, nil)
 	if err != nil {
 		slog.Error("http error",
 			"error", err.Error(),
@@ -97,7 +116,7 @@ func getWikis(baseURL, repoURLType, token string, project Projects) (Projects, e
 		return Projects{}, err
 	}
 
-	if len(body) < 3 {
+	if len(respBody) < 3 {
 		return Projects{}, fmt.Errorf("no found wikis")
 	}
 
@@ -111,7 +130,65 @@ func getWikis(baseURL, repoURLType, token string, project Projects) (Projects, e
 	}, nil
 }
 
-func do(url, token string) ([]byte, error) {
+func hasRegistry(baseURL, token string, project Projects) (bool, error) {
+	url := fmt.Sprintf("%s/api/v4/projects/%d/registry/repositories",
+		baseURL,
+		project.ID,
+	)
+
+	respBody, err := do(http.MethodGet, url, token, nil)
+	if err != nil {
+		slog.Error("http error",
+			"error", err.Error(),
+			"url", url,
+		)
+
+		return false, err
+	}
+
+	var registry []Registry
+
+	err = json.Unmarshal(respBody, &registry)
+	if err != nil {
+		slog.Error("unmarshal error",
+			"error", err.Error(),
+			"url", url,
+		)
+
+		return false, err
+	}
+
+	if len(registry) == 0 {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func setCleanup(baseURL, token string, project Projects) error {
+	url := fmt.Sprintf("%s/api/v4/projects/%d",
+		baseURL,
+		project.ID,
+	)
+
+	data := []byte(`{ "container_expiration_policy_attributes": { "enabled": true, "cadence": "1d", "keep_n": "5", "older_than": "7d", "name_regex": ".*", "name_regex_keep": null } }`)
+
+	respBody, err := do(http.MethodPut, url, token, bytes.NewBuffer(data))
+	if err != nil {
+		slog.Error("http error",
+			"error", err.Error(),
+			"url", url,
+		)
+
+		return err
+	}
+
+	_ = len(respBody) // debug
+
+	return nil
+}
+
+func do(method, url, token string, body io.Reader) ([]byte, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
@@ -120,12 +197,13 @@ func do(url, token string) ([]byte, error) {
 		Timeout:   15 * time.Second,
 	}
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(context.Background(), method, url, body)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Set(privateTokenHeader, token)
+	req.Header.Set(contentTypeHeader, applicationJSONHeader)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -136,7 +214,7 @@ func do(url, token string) ([]byte, error) {
 		return nil, fmt.Errorf("bad http response: %v", resp.Status)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +224,7 @@ func do(url, token string) ([]byte, error) {
 		return nil, err
 	}
 
-	return body, nil
+	return respBody, nil
 }
 
 func getRepoURL(repoURLType string, project Projects) string {
