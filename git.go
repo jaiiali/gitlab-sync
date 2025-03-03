@@ -18,37 +18,39 @@ func pull(dir string) ([]byte, error) {
 		return []byte{}, err
 	}
 
-	// git branch track
-	cmdBranch := exec.Command("git", "branch", "-r")
-
-	outBranch, errBranch := cmdBranch.Output()
-	if errBranch != nil {
-		return []byte{}, errBranch
+	// get all branches
+	allBranches, errAllBranches := getAllBranches()
+	if errAllBranches != nil {
+		return []byte{}, errAllBranches
 	}
 
-	outBranchStr := string(outBranch)
-	outBranchStr = strings.TrimSpace(outBranchStr)
-
-	for _, branch := range strings.Split(outBranchStr, "\n") {
-		branch = strings.TrimSpace(branch)
-		if branch == "" {
+	for _, branch := range allBranches {
+		errSwitchBranch := switchBranch(branch)
+		if errSwitchBranch != nil {
 			continue
 		}
 
-		if strings.Contains(branch, "->") {
-			continue
-		}
+		// git pull
+		cmdPull := exec.Command("git", "pull")
 
-		localBranch := strings.TrimLeft(branch, "origin/")
-		cmdTrack := exec.Command("git", "branch", "--track", localBranch, branch)
-
-		errTrack := cmdTrack.Run()
-		if errTrack != nil {
+		errPull := cmdPull.Run()
+		if errPull != nil {
 			continue
 		}
 	}
 
-	// git fetch
+	// get default branch
+	defaultBranch, errorDefaultBranch := getDefaultBranch()
+	if errorDefaultBranch != nil {
+		return []byte{}, errorDefaultBranch
+	}
+
+	errSwitchBranch := switchBranch(defaultBranch)
+	if errSwitchBranch != nil {
+		return []byte{}, errSwitchBranch
+	}
+
+	// git fetch all
 	cmdFetch := exec.Command("git", "fetch", "--all")
 
 	errFetch := cmdFetch.Run()
@@ -56,8 +58,61 @@ func pull(dir string) ([]byte, error) {
 		return []byte{}, errFetch
 	}
 
-	// git pull
+	// git pull all
 	cmd := exec.Command("git", "pull", "--all")
 
 	return cmd.Output()
+}
+
+func switchBranch(branch string) error {
+	cmd := exec.Command("git", "switch", branch)
+
+	_, err := cmd.Output()
+
+	return err
+}
+
+func getDefaultBranch() (string, error) {
+	cmd := exec.Command("git", "symbolic-ref", "refs/remotes/origin/HEAD", "--short")
+
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	branch := strings.TrimLeft(string(out), "origin/")
+
+	return branch, nil
+}
+
+func getAllBranches() ([]string, error) {
+	cmd := exec.Command("git", "branch", "-r")
+
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	outStr := string(out)
+	outStr = strings.TrimSpace(outStr)
+
+	branches := []string{}
+
+	for _, branch := range strings.Split(outStr, "\n") {
+		branchName, after, found := strings.Cut(branch, "->")
+		if found {
+			branchName = after
+		}
+
+		branchName = strings.TrimSpace(branchName)
+		if branchName == "" {
+			continue
+		}
+
+		branchName = strings.TrimLeft(branchName, "origin/")
+
+		branches = append(branches, branchName)
+	}
+
+	return branches, nil
 }
