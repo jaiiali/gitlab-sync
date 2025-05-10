@@ -5,15 +5,18 @@ import (
 	"log/slog"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 )
 
 const (
 	basePathEnv                     = "BASE_PATH"
 	baseURLEnv                      = "BASE_URL"
+	baseGroupIDEnv                  = "BASE_GROUP_ID"
 	repoURLTypeEnv                  = "REPO_URL_TYPE"
 	tokenEnv                        = "TOKEN"
 	orderByEnv                      = "ORDER_BY"
+	pullAllBranchesEnv              = "PULL_ALL_BRANCHES"
 	setContainerExpirationPolicyEnv = "SET_CONTAINER_EXPIRATION_POLICY"
 	installEnv                      = "INSTALL"
 	dirPermission                   = 0o766
@@ -32,9 +35,11 @@ func main() {
 
 	basePath := os.Getenv(basePathEnv)
 	baseURL := os.Getenv(baseURLEnv)
+	baseGroupID := os.Getenv(baseGroupIDEnv)
 	repoURLType := os.Getenv(repoURLTypeEnv)
 	token := os.Getenv(tokenEnv)
 	orderBy := os.Getenv(orderByEnv)
+	pullAllBranches := os.Getenv(pullAllBranchesEnv)
 	setContainerExpirationPolicy := os.Getenv(setContainerExpirationPolicyEnv)
 	install := os.Getenv(installEnv)
 
@@ -44,6 +49,11 @@ func main() {
 		return
 	}
 
+	_, err := strconv.Atoi(baseGroupID)
+	if err != nil {
+		baseGroupID = ""
+	}
+
 	if strings.ToLower(repoURLType) == repoURLTypeHTTP {
 		repoURLType = repoURLTypeHTTP
 	}
@@ -51,6 +61,11 @@ func main() {
 	orderByItems := []string{"id", "name", "path", "created_at", "updated_at", "last_activity_at"}
 	if orderBy == "" || !slices.Contains(orderByItems, orderBy) {
 		orderBy = "id"
+	}
+
+	pullAllBranchesStatus := false
+	if strings.ToLower(pullAllBranches) == "true" {
+		pullAllBranchesStatus = true
 	}
 
 	setContainerExpirationPolicyAttr := false
@@ -63,7 +78,7 @@ func main() {
 		installPackage = true
 	}
 
-	projects := getProjects(baseURL, repoURLType, token, orderBy, setContainerExpirationPolicyAttr)
+	projects := getProjects(baseURL, baseGroupID, repoURLType, token, orderBy, setContainerExpirationPolicyAttr)
 
 	projectsCount := len(projects)
 	if projectsCount == 0 {
@@ -102,7 +117,7 @@ func main() {
 		if projectPathErr == nil {
 			slog.Info("git pull")
 
-			gitOut, gitErr = pull(projectPath)
+			gitOut, gitErr = pull(projectPath, pullAllBranchesStatus)
 		} else {
 			slog.Info("git clone")
 

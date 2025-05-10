@@ -21,7 +21,7 @@ const (
 	applicationJSONHeader = "application/json"
 )
 
-func getProjects(baseURL, repoURLType, token, orderBy string, setContainerExpirationPolicyAttr bool) []Projects {
+func getProjects(baseURL, baseGroupID, repoURLType, token, orderBy string, setContainerExpirationPolicyAttr bool) []Projects {
 	var (
 		pageNumber int
 		projects   []Projects
@@ -41,6 +41,16 @@ func getProjects(baseURL, repoURLType, token, orderBy string, setContainerExpira
 			pageSize,
 			pageNumber,
 		)
+
+		if baseGroupID != "" {
+			url = fmt.Sprintf("%s/api/v4/groups/%s/projects?order_by=%s&sort=desc&per_page=%d&page=%d",
+				baseURL,
+				baseGroupID,
+				orderBy,
+				pageSize,
+				pageNumber,
+			)
+		}
 
 		respBody, err := do(http.MethodGet, url, token, nil)
 		if err != nil {

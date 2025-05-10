@@ -12,30 +12,32 @@ func clone(url, dir string) ([]byte, error) {
 	return cmd.Output()
 }
 
-func pull(dir string) ([]byte, error) {
+func pull(dir string, pullAllBranches bool) ([]byte, error) {
 	err := os.Chdir(dir)
 	if err != nil {
 		return []byte{}, err
 	}
 
 	// get all branches
-	allBranches, errAllBranches := getAllBranches()
-	if errAllBranches != nil {
-		return []byte{}, errAllBranches
-	}
-
-	for _, branch := range allBranches {
-		errSwitchBranch := switchBranch(branch)
-		if errSwitchBranch != nil {
-			continue
+	if pullAllBranches {
+		allBranches, errAllBranches := getAllBranches()
+		if errAllBranches != nil {
+			return []byte{}, errAllBranches
 		}
 
-		// git pull
-		cmdPull := exec.Command("git", "pull")
+		for _, branch := range allBranches {
+			errSwitchBranch := switchBranch(branch)
+			if errSwitchBranch != nil {
+				continue
+			}
 
-		errPull := cmdPull.Run()
-		if errPull != nil {
-			continue
+			// git pull
+			cmdPull := exec.Command("git", "pull")
+
+			errPull := cmdPull.Run()
+			if errPull != nil {
+				continue
+			}
 		}
 	}
 
