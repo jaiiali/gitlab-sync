@@ -82,7 +82,9 @@ func getDefaultBranch() (string, error) {
 		return "", err
 	}
 
-	branch := strings.TrimLeft(string(out), "origin/")
+	outStr := string(out)
+	outStr = strings.TrimSpace(outStr)
+	branch := strings.TrimLeft(outStr, "origin/")
 
 	return branch, nil
 }
