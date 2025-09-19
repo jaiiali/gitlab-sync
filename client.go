@@ -43,7 +43,7 @@ func getProjects(baseURL, baseGroupID, repoURLType, token, orderBy string, setCo
 		)
 
 		if baseGroupID != "" {
-			url = fmt.Sprintf("%s/api/v4/groups/%s/projects?order_by=%s&sort=desc&per_page=%d&page=%d",
+			url = fmt.Sprintf("%s/api/v4/groups/%s/projects?include_subgroups=true&order_by=%s&sort=desc&per_page=%d&page=%d",
 				baseURL,
 				baseGroupID,
 				orderBy,
